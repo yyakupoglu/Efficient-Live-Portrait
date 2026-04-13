@@ -3,89 +3,61 @@
 # Email: tinprocoder0908@gmail.com
 
 import os
-import requests
 from dataclasses import dataclass, asdict
 from typing import Literal, Tuple
-from tqdm import tqdm
 import torch.cuda
 import yaml
 
-# Define the URLs for the model files
-MODEL_URLS = {
+# Expected filenames under live_portrait_weights/{live_portrait,insightface}/ (no auto-download).
+LOCAL_MODEL_FILENAMES = {
     'live_portrait': {
-        'grid_sample_3d': 'https://huggingface.co/myn0908/Live-Portrait-ONNX/resolve/main/libgrid_sample_3d_plugin.so?download=true',
-        'F_onnx': 'https://huggingface.co/myn0908/Live-Portrait-ONNX/resolve/main/appearance_feature_extractor.onnx?download=true',
-        'M_onnx': 'https://huggingface.co/myn0908/Live-Portrait-ONNX/resolve/main/motion_extractor.onnx?download=true',
-        'GW_onnx': 'https://huggingface.co/myn0908/Live-Portrait-ONNX/resolve/main/generator_fix_grid.onnx?download=true',
-        'S_onnx': 'https://huggingface.co/myn0908/Live-Portrait-ONNX/resolve/main/stitching.onnx?download=true',
-        'SE_onnx': 'https://huggingface.co/myn0908/Live-Portrait-ONNX/resolve/main/stitching_eye.onnx?download=true',
-        'SL_onnx': 'https://huggingface.co/myn0908/Live-Portrait-ONNX/resolve/main/stitching_lip.onnx?download=true',
-        # TensorRT FP32
-        'F_rt': 'https://huggingface.co/myn0908/Live-Portrait-TensorRT-FP32/resolve/main/appearance_feature_extractor_fp32.engine?download=true',
-        'M_rt': 'https://huggingface.co/myn0908/Live-Portrait-TensorRT-FP32/resolve/main/motion_extractor_fp32.engine?download=true',
-        'GW_rt': 'https://huggingface.co/myn0908/Live-Portrait-TensorRT-FP32/resolve/main/generator_fp32.engine?download=true',
-        'S_rt': 'https://huggingface.co/myn0908/Live-Portrait-TensorRT-FP32/resolve/main/stitching_fp32.engine?download=true',
-        'SE_rt': 'https://huggingface.co/myn0908/Live-Portrait-TensorRT-FP32/resolve/main/stitching_eye_fp32.engine?download=true',
-        'SL_rt': 'https://huggingface.co/myn0908/Live-Portrait-TensorRT-FP32/resolve/main/stitching_lip_fp32.engine?download=true',
-        # TensorRT FP16
-        'F_rt_half': 'https://huggingface.co/myn0908/Live-Portrait-TensorRT-FP16/resolve/main/appearance_feature_extractor_fp16.engine?download=true',
-        'M_rt_half': 'https://huggingface.co/myn0908/Live-Portrait-TensorRT-FP16/resolve/main/motion_extractor_fp16.engine?download=true',
-        'GW_rt_half': 'https://huggingface.co/myn0908/Live-Portrait-TensorRT-FP16/resolve/main/generator_fp16.engine?download=true',
-        'S_rt_half': 'https://huggingface.co/myn0908/Live-Portrait-TensorRT-FP16/resolve/main/stitching_fp16.engine?download=true',
-        'SE_rt_half': 'https://huggingface.co/myn0908/Live-Portrait-TensorRT-FP16/resolve/main/stitching_eye_fp16.engine?download=true',
-        'SL_rt_half': 'https://huggingface.co/myn0908/Live-Portrait-TensorRT-FP16/resolve/main/stitching_lip_fp16.engine?download=true'
+        'grid_sample_3d': 'libgrid_sample_3d_plugin.so',
+        'F_onnx': 'appearance_feature_extractor.onnx',
+        'M_onnx': 'motion_extractor.onnx',
+        'GW_onnx': 'generator_fix_grid.onnx',
+        'S_onnx': 'stitching.onnx',
+        'SE_onnx': 'stitching_eye.onnx',
+        'SL_onnx': 'stitching_lip.onnx',
+        'F_rt': 'appearance_feature_extractor_fp32.engine',
+        'M_rt': 'motion_extractor_fp32.engine',
+        'GW_rt': 'generator_fp32.engine',
+        'S_rt': 'stitching_fp32.engine',
+        'SE_rt': 'stitching_eye_fp32.engine',
+        'SL_rt': 'stitching_lip_fp32.engine',
+        'F_rt_half': 'appearance_feature_extractor_fp16.engine',
+        'M_rt_half': 'motion_extractor_fp16.engine',
+        'GW_rt_half': 'generator_fp16.engine',
+        'S_rt_half': 'stitching_fp16.engine',
+        'SE_rt_half': 'stitching_eye_fp16.engine',
+        'SL_rt_half': 'stitching_lip_fp16.engine',
     },
     'insightface': {
-        'arc_face': 'https://huggingface.co/myn0908/Live-Portrait-ONNX/resolve/main/w600k_r50.onnx?download=true',
-        '2d106det': 'https://huggingface.co/myn0908/Live-Portrait-ONNX/resolve/main/2d106det.onnx?download=true',
-        'det_10g': 'https://huggingface.co/myn0908/Live-Portrait-ONNX/resolve/main/det_10g.onnx?download=true',
-        'landmark': 'https://huggingface.co/myn0908/Live-Portrait-ONNX/resolve/main/landmark.onnx?download=true'
-    }
+        'arc_face': 'w600k_r50.onnx',
+        '2d106det': '2d106det.onnx',
+        'det_10g': 'det_10g.onnx',
+        'landmark': 'landmark.onnx',
+    },
 }
 
 
-# Function to download a file from a URL and save it locally
-def downloading(url, outf):
-    if not os.path.exists(outf):
-        print(f"Downloading checkpoint to {outf}")
-        response = requests.get(url, stream=True)
-        total_size_in_bytes = int(response.headers.get('content-length', 0))
-        block_size = 1024  # 1 Kibibyte
-        progress_bar = tqdm(total=total_size_in_bytes, unit='iB', unit_scale=True)
-        with open(outf, 'wb') as file:
-            for data in response.iter_content(block_size):
-                progress_bar.update(len(data))
-                file.write(data)
-        progress_bar.close()
-        if total_size_in_bytes != 0 and progress_bar.n != total_size_in_bytes:
-            print("ERROR, something went wrong")
-        print(f"Downloaded successfully to {outf}")
-    else:
-        return outf
-
-
-def get_efficient_live_portrait():
-    # Download the models and save them in the current working directory
+def get_local_model_paths():
+    """Resolve paths under ./live_portrait_weights/ from cwd. Does not download."""
     current_dir = os.getcwd()
     face_dir = os.path.join(current_dir, 'live_portrait_weights')
     model_paths = {}
-    for main_key, sub_dict in MODEL_URLS.items():
-        dir_path = os.path.join(current_dir, 'live_portrait_weights', main_key)
-        os.makedirs(dir_path, exist_ok=True)
-        model_paths[main_key] = {}
-        for sub_key, url in sub_dict.items():
-            filename = url.split('/')[-1].split('?')[0]
-            save_path = os.path.join(dir_path, filename)
-            downloading(url, save_path)
-            model_paths[main_key][sub_key] = save_path
-        print('Downloaded successfully and already saved')
+    for main_key, sub_dict in LOCAL_MODEL_FILENAMES.items():
+        dir_path = os.path.join(face_dir, main_key)
+        model_paths[main_key] = {
+            sub_key: os.path.join(dir_path, filename)
+            for sub_key, filename in sub_dict.items()
+        }
     return model_paths, face_dir
 
 
 @dataclass(repr=False)  # use repr from PrintableConfig
 class Config:
-    model_paths, face_dir = get_efficient_live_portrait()
-    grid_sample_3d: str = model_paths['live_portrait']['grid_sample_3d']
+    model_paths, face_dir = get_local_model_paths()
+    grid_sample_3d: str = os.getenv('GRID_SAMPLE_3D_PLUGIN', model_paths['live_portrait']['grid_sample_3d'])
     # ONNX
     checkpoint_F: str = model_paths['live_portrait']['F_onnx']  # path to checkpoint
     checkpoint_M: str = model_paths['live_portrait']['M_onnx']  # path to checkpoint

@@ -1,0 +1,20 @@
+services:
+  EfficientLivePortrait:
+    container_name: EfficientLivePortrait
+    build: .
+    image: efficient-live-portrait:latest
+    runtime: nvidia
+    ipc: host
+    ulimits:
+      memlock: -1
+      stack: 67108864
+    devices:
+      - /dev/snd
+      - /dev/video0
+    ports:
+      - "8890:8890"
+    volumes:
+      - "/tmp/.X11-unix/:/tmp/.X11-unix"
+      - "/mnt/data/Projects/Efficient-Live-Portrait-2:/workspace/Efficient-Live-Portrait"
+    working_dir: /workspace/Efficient-Live-Portrait
+    command: [ "./run.sh" ]

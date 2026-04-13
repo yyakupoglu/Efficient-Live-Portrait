@@ -5,7 +5,6 @@
 import tensorrt as trt
 import pycuda.driver as cuda
 import pycuda.gpuarray
-import pycuda.autoinit
 import numpy as np
 import ctypes
 
@@ -213,13 +212,10 @@ class TensorRTEngine:
         return result
 
     def __del__(self):
-        del self.engines
-        del self.contexts
-        del self.bindings
-        del self.binding_addresses
-        del self.inputs
-        del self.outputs
-        del self.stream
+        for attr in ['engines', 'contexts', 'bindings', 'binding_addresses', 'inputs', 'outputs', 'stream']:
+            if hasattr(self, attr):
+                delattr(self, attr)
+
         try:
             if self.cfx is not None:
                 self.cfx.pop()

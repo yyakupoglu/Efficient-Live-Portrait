@@ -2,6 +2,8 @@
 # Author: Vo Nguyen An Tin
 # Email: tinprocoder0908@gmail.com
 
+import os
+os.environ.setdefault('QT_QPA_PLATFORM', 'offscreen')
 import cv2
 import numpy as np
 import os.path as osp
@@ -9,7 +11,7 @@ from tqdm import tqdm
 from LivePortrait.commons import load_image_rgb, resize_to_limit, basename, images2video
 from LivePortrait.controlnet_sdxl_lightning import SDXLLightningOpenPose
 from LivePortrait.live_portrait import PortraitController
-
+import pdb
 
 class EfficientLivePortrait(PortraitController):
     def __init__(self, use_tensorrt, half, cropping_video, **kwargs):
@@ -362,28 +364,77 @@ class EfficientLivePortrait(PortraitController):
         """
         Video_path_or_id is use for 2 process, please make sure video_id only use for real-time demo
         """
-
+        # pdb.set_trace()
         if task == 'webcam':
+            import time
             _, _, x_s, f_s, r_s, \
                 x_s_info, lip_delta_before_animation, crop_info, \
                 img_rgb, _ = self.prepare_webcam_portrait(source_image_path=image_path)
-            cap = cv2.VideoCapture(int(video_path_or_id) if task == 'webcam' else video_path_or_id)
-            while cap.isOpened():
-                ret, frame = cap.read()
-                if not ret:
-                    break
-                x_s, x_d_i_new = self.get_kp_info(frame, x_s, r_s, x_s_info,
-                                                  lip_delta_before_animation)
-                i_p_i = self.warp_decode(f_s, np.array(x_s),
-                                         np.array(x_d_i_new))
-                if self.config['flag_pasteback']:
-                    mask_ori = self.prepare_paste_back(self.config['mask_crop'], crop_info['M_c2o'])
-                    i_p_i_to_ori_blend = self.paste_back(i_p_i, crop_info['M_c2o'], img_rgb, mask_ori)
-                    cv2.imshow('a', i_p_i_to_ori_blend[:, :, ::-1])
-                if cv2.waitKey(1) & 0xff == ord('q'):
-                    break
-            cap.release()
-            cv2.destroyAllWindows()
+            # Pre-compute mask once (outside the loop for speed)
+            mask_ori = None
+            if self.config['flag_pasteback']:
+                mask_ori = self.prepare_paste_back(
+                    crop_info['M_c2o'],
+                    dsize=(img_rgb.shape[1], img_rgb.shape[0])
+                )
+            cam_id = int(video_path_or_id) if video_path_or_id.isdigit() else video_path_or_id
+            cap = cv2.VideoCapture(cam_id)
+            # In offscreen Qt mode, cv2.imshow won't work — always use video writer
+            has_display = False
+            # Set up video writer as fallback
+            writer = None
+            if not has_display:
+                self.mkdir('animations')
+                out_path = osp.join('animations', 'webcam_realtime.mp4')
+                fourcc = cv2.VideoWriter_fourcc(*'mp4v')
+                w = int(cap.get(cv2.CAP_PROP_FRAME_WIDTH))
+                h = int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
+                writer = cv2.VideoWriter(out_path, fourcc, 25, (img_rgb.shape[1], img_rgb.shape[0]))
+                print(f'No display found. Writing output to: {out_path}')
+            fps_counter = 0
+            fps_time = time.time()
+            fps_display = 0
+            frame_count = 0
+            print('Real-time webcam mode started. Press q to quit (if display) or Ctrl+C to stop.')
+            try:
+                while cap.isOpened():
+                    ret, frame = cap.read()
+                    if not ret:
+                        break
+                    x_s, x_d_i_new = self.get_kp_info(frame, x_s, r_s, x_s_info,
+                                                      lip_delta_before_animation)
+                    i_p_i = self.warp_decode(f_s, np.array(x_s),
+                                             np.array(x_d_i_new))
+                    if self.config['flag_pasteback'] and mask_ori is not None:
+                        result = self.paste_back(i_p_i, crop_info['M_c2o'], img_rgb, mask_ori)
+                    else:
+                        result = i_p_i
+                    # FPS tracking
+                    fps_counter += 1
+                    frame_count += 1
+                    now = time.time()
+                    if now - fps_time >= 1.0:
+                        fps_display = fps_counter
+                        fps_counter = 0
+                        fps_time = now
+                        print(f'\rFPS: {fps_display} | Frames: {frame_count}', end='', flush=True)
+                    result_bgr = result[:, :, ::-1] if result.ndim == 3 else result
+                    if has_display:
+                        cv2.imshow('LivePortrait', result_bgr)
+                        if cv2.waitKey(1) & 0xff == ord('q'):
+                            break
+                    elif writer is not None:
+                        writer.write(result_bgr)
+            except KeyboardInterrupt:
+                print('\nStopped by user.')
+            finally:
+                print(f'\nTotal frames processed: {frame_count}')
+                cap.release()
+                if writer is not None:
+                    writer.release()
+                    print(f'Video saved to: {osp.join("animations", "webcam_realtime.mp4")}')
+                if has_display:
+                    cv2.destroyAllWindows()
         elif task == 'image':
             if use_diffusion:
                 print('Process Img2Img')

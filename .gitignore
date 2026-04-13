@@ -1,23 +1,38 @@
-__pycache__
-.idea
-animations/Live-Portrait-ONNX
-Live-Portrait-TensorRT
-Live-Portrait-TensorRT-FP32
-Live-Portrait-TensorRT-FP16
-live_portrait_weights
-animations
-*.pyc
-debug
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+
+# Environments
+.env
+.venv
+env/
+venv/
+ENV/
+env.bak/
+venv.bak/
+
+# Live Portrait weights and models
+live_portrait_weights/
+*.engine
+*.onnx
+
+# TensorRT / CUDA
+grid/build/
+
+# IDEs and Editors
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
 .DS_Store
-code_test.py
-output_video.mp4
-run_live_portrait_img2img.py
-push_model_hf.py
-test_cfg.py
-spade_generator.onnx
-spade_generator.quant.onnx
-efficient-live-portrait.yaml
-img.png
-img_1.png
-test_2_multiple_face.mp4
-test_driving_3_face.mp4
+
+# Output videos / testing
+*.mp4
+*.gif
+experiment_examples/result/
+
+# Antigravity temporary files
+.antigravityignore
