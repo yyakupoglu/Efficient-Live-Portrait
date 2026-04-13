@@ -1,30 +1,5 @@
 # Efficient-Live-Portrait
 
-## Introduction
-This repo is the optimize task by converted to ONNX and TensorRT models for [LivePortrait: Efficient Portrait Animation with Stitching and Retargeting Control](https://github.com/KwaiVGI/LivePortrait).
-We are actively updating and improving this repository. If you find any bugs or have suggestions, welcome to raise issues or submit pull requests (PR) 💖.
-
-Also we adding feature: 
-+ Real-Time demo with ONNX models
-+ TensorRT runtime with latest Tensorrt version. You should run on Colab, this still can't use on Window
-+ Face-ID adapter for control Face animation in the Multiple Faces image you want to do
-+ Coming soon for ControlNet Stable Diffusion. Stay tuned
-## Features
-[✅] 20/07/2024: TensorRT Engine code and Demo
-
-[✅] 22/07/2024: Support Multiple Faces
-
-[✅] 22/07/2024: Face-ID Adapter for Control Face Animation
-
-[✅] 24/07/2024: Multiple Face motion in Video for animation multiples Face in image
-
-[✅] 28/07/2024: Supported Video2Video Live Portrait (only use one Face)
-
-[✅] 30/07/2024: Support SDXL-Lightning Controlnet-Open-Pose from 1 to 8 step for change source image to Art Image
-
-[  ] Integrate Animate-Diff Lightning Motion module
-
-
 ## 🔥 Getting Started
 
 ### 1. Prerequisites
