@@ -56,81 +56,48 @@ Also we adding feature:
 
 
 ## 🔥 Getting Started
-### 1. Clone the code and prepare the environment
+
+### 1. Prerequisites
+You no longer need to manage complex Conda environments or compile C++ plugins manually. This repository is now fully containerized!
+
+Make sure you have installed:
+* [Docker](https://docs.docker.com/get-docker/)
+* [Docker Compose](https://docs.docker.com/compose/install/)
+* [NVIDIA Container Toolkit](https://docs.nvidia.com/datacenter/cloud-native/container-toolkit/latest/install-guide.html) (for GPU support)
+
+### 2. Idempotent Setup & Run
+Simply clone the repository and use Docker Compose. The system will automatically:
+1. Download all required ONNX weights from HuggingFace (if missing).
+2. Patch the GridSample ONNX operators for TensorRT compatibility.
+3. Compile all 12 TensorRT engines (FP16 and FP32) optimized specifically for your GPU.
+4. Launch the web-based video stream.
+
 ```bash
 git clone https://github.com/aihacker111/Efficient-Live-Portrait
-# create env using conda
-conda create -n ELivePortrait python==3.10.14
-conda activate ELivePortrait
-# install dependencies with CPU
-pip install -r requirements-cpu.txt
-# install dependencies with GPU
-pip install -r requirements-gpu.txt
-# install dependencies with pip for mps
-pip install -r requirements-mps.txt 
+cd Efficient-Live-Portrait
+
+# Build the environment and start the setup/stream
+docker compose up --build
 ```
+> **Note:** The first run will take several minutes to download the ~2GB of weights and build the TensorRT engines. Subsequent runs will start almost instantly!
 
-**Note:** make sure your system has [FFmpeg](https://ffmpeg.org/) installed!
-
-### 2. Download pretrained weights
-
-The pretrained weights is also automatic downloading
-You don't need to download and put model into sources code
-```text
-pretrained_weights
-|
-├── landmarks
-│   └── models
-│       └── buffalo_l
-│       |   ├── 2d106det.onnx
-│       |    └── det_10g.onnx
-|       └── landmark.onnx
-└── live_portrait
-      |
-      ├── appearance_feature_extractor.onnx
-      ├── motion_extractor.onnx
-      ├── generator_warping.onnx
-      ├── stitching_retargeting.onnx
-      └── stitching_retargeting_eye.onnx
-      └── stitching_retargeting_lip.onnx
-      ├── appearance_feature_extractor_fp32.engine
-      ├── motion_extractor_fp32.engine
-      ├── generator_fp32.engine
-      ├── stitching_fp32.engine
-      └── stitching_eye_fp32.engine
-      └── stitching_lip_fp32.engine
-      ├── appearance_feature_extractor_fp16.engine
-      ├── motion_extractor_fp16.engine
-      ├── generator_fp16.engine
-      ├── stitching_fp16.engine
-      └── stitching_eye_fp16.engine
-      └── stitching_lip_fp16.engine
-      
-
-```
 ### 3. Inference and Real-time Demo 🚀
-#### Fast hands-on
 
-+ TensorRT FP32 is seem slower than FP16 but result better than fp16, so be careful to use both of it, I'm not recommend using ONNX model because it's not still update and fix grid sample or speed
-+ Also If you want to Quality Result. Please remove FP16, the speed can be slower than fp16 but result is better
-For run Face-ID mode:
-```bash
-python run_live_portrait.py --driving_video 'path/to/your/video/driving/or/webcam/id' --source_image 'path/to/your/image/want/to/animation' -condition_image 'path/the/single/face/image/to/compute/face-id' --task ['image', 'video', 'webcam'] --run_time --half_precision --use_face_id 
+#### Web Streaming (Headless)
+Once `docker compose up` finishes the setup loop, it will automatically launch the webcam stream. 
+
+Open your browser and navigate to:
+```text
+http://localhost:8890
 ```
-For run Multiple Face Motion mode:
-```bash
-python run_live_portrait.py --driving_video 'path/to/your/video/driving/or/webcam/id' --source_image 'path/to/your/image/want/to/animation'  --task ['image', 'video', 'webcam'] --run_time --half_precision
-```
-For Vid2Vid Live Portrait:
-```bash
-python run_live_portrait.py --driving_video 'path/to/your/video/driving/or/webcam/id' --source_video 'path/to/your/video/want/to/animation'  --task ['image', 'video', 'webcam'] --run_time --half_precision
-```
-For SDXL-Lightning + OpenPose-Lora + Live Portrait
-```bash
-python /content/Efficient-Live-Portrait/run_live_portrait.py --driving_video 'path/to/your/video' --source_image 'path/to/your/image/want/to/animation'  --run_time --task image --use_diffusion --lcm_steps [1, 2, 4, 8] --prompt '1girl, offshoulder, light smile, shiny skin best quality, masterpiece, photorealistic'
-```
+
+By default, it runs in `--mixed` mode (FP32 for motion extraction, FP16 for the rest) to ensure the highest quality without sacrificing real-time speed.
+
+* To edit the setup, modify `run_webcam_stream.py` arguments inside `run.sh`.
+* To test different input images, replace `experiment_examples/examples/source/s0.jpg`.
+
 #### Colab Demo
- Follow in the colab folder
-### 5. Inference speed evaluation 🚀🚀🚀
+Follow the instructions in the `colab` folder for cloud-based execution.
 
-We'll release it soon
+### 4. Inference speed evaluation 🚀🚀🚀
+We'll release it soon.
